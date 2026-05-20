@@ -1,0 +1,66 @@
+# Poker Journal — brain-app manifest
+#
+# A field journal for poker, run as a brain-app inside your own
+# BrainFoundry brain. Three modes:
+#
+#  - Hand     paste a hand-history export (e.g. PokerStars text). Your
+#             brain reads it and proposes a session entry plus 0..N leak
+#             entries. You approve per-entry.
+#  - Reflect  post-session prompts (what felt off, where discipline
+#             slipped, dominant emotion). Your brain synthesises
+#             impression + leak proposals. You approve per-entry.
+#  - Ask      grounded chat scoped to your poker corpus. The brain
+#             answers from your own hand histories, leaks, impressions,
+#             framework documents.
+#
+# The app carries no intelligence. Reasoning and memory live in the
+# host brain. Standalone, the app shows a "no brain attached" message
+# and does not fabricate.
+#
+# Schema: registry/schema/brain/app.schema.json (in hbar.world)
+# Created: 2026-05-20
+
+dialect: brain-app/v1
+id: poker-journal
+name: Poker Journal
+version: 0.1.0
+description: Hand histories, leaks, impressions. Three modes. Paste, reflect, ask.
+license: AGPL-3.0
+
+author:
+  name: hbar
+  url: https://hbar.systems
+  contact: hello@hbar.systems
+
+repo: https://github.com/hbar-systems/hbar-poker-journal
+
+tab:
+  label: Poker
+  route: /poker
+  order: 40
+
+entries:
+  ui_bundle: ./
+
+permissions:
+  - llm.invoke
+  - memory.write
+
+requires_layers:
+  - layer: episodic
+    mode: read
+  - layer: episodic
+    mode: append
+  - layer: semantic
+    mode: read
+  - layer: semantic
+    mode: append
+  - layer: procedural
+    mode: append
+
+requires_endpoints:
+  - POST /chat/rag
+  - POST /memory/append
+
+engines:
+  brainfoundry-nous: ">=0.8.4"
