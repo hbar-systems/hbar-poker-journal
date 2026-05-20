@@ -1,7 +1,7 @@
 # Poker Journal — brain-app manifest
 #
 # A field journal for poker, run as a brain-app inside your own
-# BrainFoundry brain. Three modes:
+# BrainFoundry brain. Four modes:
 #
 #  - Hand     paste a hand-history export (e.g. PokerStars text). Your
 #             brain reads it and proposes a session entry plus 0..N leak
@@ -12,6 +12,9 @@
 #  - Ask      grounded chat scoped to your poker corpus. The brain
 #             answers from your own hand histories, leaks, impressions,
 #             framework documents.
+#  - Theory   click a poker concept; the brain explains it, grounded in
+#             any theory material you have ingested. Keep notable
+#             explanations into your own memory via "Keep this".
 #
 # The app carries no intelligence. Reasoning and memory live in the
 # host brain. Standalone, the app shows a "no brain attached" message
@@ -23,8 +26,8 @@
 dialect: brain-app/v1
 id: poker-journal
 name: Poker Journal
-version: 0.1.0
-description: Hand histories, leaks, impressions. Three modes. Paste, reflect, ask.
+version: 0.2.0
+description: Hand histories, leaks, impressions, theory. Four modes — paste, reflect, ask, study.
 license: AGPL-3.0
 
 author:

@@ -161,6 +161,37 @@
   .chat .msg .srcs { margin-top: 8px; font-size: 11.5px; color: var(--ink-faint); }
   .chat-input { display: flex; gap: 8px; margin-top: 14px; align-items: flex-end; }
   .chat-input textarea { min-height: 60px; }
+  .msg .keep-bar { margin-top: 8px; display: flex; gap: 8px; align-items: center; }
+  .msg .keep-bar button {
+    background: transparent; border: 1px solid var(--line); color: var(--ink-dim);
+    font-family: var(--serif); font-size: 12px; padding: 4px 10px;
+    cursor: pointer; border-radius: 2px; letter-spacing: 0.04em;
+  }
+  .msg .keep-bar button:hover:not(:disabled) { color: var(--gold); border-color: var(--gold-dim); }
+  .msg .keep-bar button:disabled { opacity: 0.45; cursor: not-allowed; }
+  .msg .keep-bar .kept { font-size: 11.5px; color: var(--gold); font-style: italic; }
+
+  .keep-card {
+    margin-top: 8px; padding: 12px 14px;
+    background: var(--paper-3); border: 1px solid var(--gold-dim); border-radius: 2px;
+  }
+  .keep-card label { margin-top: 8px; }
+  .keep-card label:first-child { margin-top: 0; }
+  .keep-card .row { margin-top: 12px; }
+
+  .chips {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    margin-bottom: 18px;
+  }
+  .chip {
+    background: var(--paper-2); border: 1px solid var(--line); color: var(--ink-dim);
+    font-family: var(--serif); font-size: 13px;
+    padding: 6px 12px; border-radius: 14px; cursor: pointer;
+    letter-spacing: 0.02em;
+  }
+  .chip:hover:not(:disabled) { color: var(--gold); border-color: var(--gold-dim); }
+  .chip:disabled { opacity: 0.45; cursor: not-allowed; }
+  .chip.busy { color: var(--gold); border-color: var(--gold); animation: pulse 1.2s ease-in-out infinite; }
 
   .mode-tag {
     text-align: center; margin-top: 26px; font-size: 11.5px;
@@ -180,6 +211,7 @@
     <button data-mode="hand" class="active">Hand</button>
     <button data-mode="reflect">Reflect</button>
     <button data-mode="ask">Ask</button>
+    <button data-mode="theory">Theory</button>
   </nav>
 
   <div id="stage"></div>
@@ -231,6 +263,28 @@ const modeButtons = document.querySelectorAll("nav.modes button");
 const LAYERS = ["episodic", "semantic", "procedural"];
 const KINDS_HAND = ["hand-history", "leak", "impression"];
 const KINDS_REFLECT = ["impression", "leak", "insight", "open-question"];
+const KINDS_KEEP = ["concept-explainer", "insight", "note", "snippet"];
+
+/* Theory concept list. Hardcoded so the app ships generically; any
+   installer benefits. The brain provides the explanation, grounded in
+   whatever theory material the operator has ingested (or general
+   knowledge if none). */
+const THEORY_CONCEPTS = [
+  { id: "pot-odds",              label: "Pot odds" },
+  { id: "equity-realization",    label: "Equity vs equity realization" },
+  { id: "position",              label: "Position (in / out of)" },
+  { id: "range-vs-hand",         label: "Range vs hand" },
+  { id: "polarised-merged",      label: "Polarised vs merged ranges" },
+  { id: "mixed-strategy",        label: "Mixed strategy" },
+  { id: "nash-equilibrium",      label: "Nash equilibrium" },
+  { id: "gto-exploit",           label: "GTO vs exploitative" },
+  { id: "cbet-frequency",        label: "C-bet frequency" },
+  { id: "bluff-frequency",       label: "Bluff frequency" },
+  { id: "variance-decision",     label: "Variance vs decision quality" },
+  { id: "ergodicity",            label: "Ergodicity / sample size" },
+  { id: "icm",                   label: "ICM (Independent Chip Model)" },
+  { id: "partial-observability", label: "Information asymmetry" },
+];
 
 const state = {
   mode: "hand",
@@ -240,6 +294,7 @@ const state = {
     proposals: [],
   },
   ask: { history: [], busy: false },
+  theory: { history: [], busy: false },
 };
 
 function show(node) { stage.innerHTML = ""; stage.appendChild(node); }
@@ -296,8 +351,10 @@ function render() {
   } else if (state.mode === "reflect") {
     if (state.reflect.proposals.length) viewProposals("reflect");
     else viewReflect();
-  } else {
+  } else if (state.mode === "ask") {
     viewAsk();
+  } else {
+    viewTheory();
   }
 }
 
@@ -578,6 +635,7 @@ function viewAsk() {
         body: r.text || "(empty reply)",
         sources: Array.isArray(r.sources) ? r.sources : [],
         model: r.model || null,
+        origin: "ask",
       };
       state.ask.history.push(msg);
       chat.appendChild(renderMsg(msg));
@@ -605,7 +663,261 @@ function renderMsg(m) {
       typeof x === "string" ? x : (x.document_name || x.title || "?")).join(" · ");
     n.appendChild(s);
   }
+  // Keep-this affordance — only on substantive brain replies.
+  if (m.who === "brain" && !m.thinking && !m.err && m.body) {
+    const bar = el("div", "keep-bar");
+    const btn = document.createElement("button");
+    btn.textContent = "Keep this";
+    btn.disabled = Bridge.standalone;
+    const status = el("span", "kept", "");
+    bar.appendChild(btn); bar.appendChild(status);
+    n.appendChild(bar);
+
+    btn.onclick = () => {
+      // Already kept or open — guard
+      if (n.querySelector(".keep-card")) return;
+      btn.disabled = true;
+      const card = keepCard({
+        seed_title: m.title || deriveTitle(m.body),
+        seed_content: m.body,
+        sources: m.sources || [],
+        origin: m.origin || "ask",     // "ask" or "theory:<concept-id>"
+      }, {
+        onClose: () => { card.remove(); btn.disabled = Bridge.standalone; },
+        onSaved: () => {
+          status.textContent = "kept in your brain";
+          card.remove();
+          btn.remove();
+        },
+      });
+      n.appendChild(card);
+    };
+  }
   return n;
+}
+
+/* ---- derive a short title from arbitrary text ---- */
+function deriveTitle(text) {
+  const first = String(text || "").trim().split(/\n/)[0] || "";
+  return first.length > 90 ? first.slice(0, 87) + "…" : first;
+}
+
+/* ----------------------------------------------------------------------
+   THEORY — click a concept, brain explains it, optionally keep the
+   explanation as a memory entry.
+---------------------------------------------------------------------- */
+function viewTheory() {
+  modeTag.textContent = Bridge.standalone
+    ? "standalone &middot; no brain attached"
+    : "theory &middot; pick a concept &mdash; the brain explains, grounded";
+
+  const v = el("div");
+
+  const note = el("div", "panel");
+  note.appendChild(el("h3", null, "Study a concept"));
+  note.appendChild(el("p", null,
+    "Click a concept. Your brain explains it &mdash; grounded in any theory material you have ingested, otherwise from general knowledge. Click " + '"' + "Keep this" + '"' + " on any explanation to save it into your own memory."));
+  v.appendChild(note);
+
+  const chips = el("div", "chips");
+  chips.style.marginTop = "16px";
+  v.appendChild(chips);
+
+  const history = el("div", "chat");
+  history.style.marginTop = "10px";
+  for (const m of state.theory.history) history.appendChild(renderMsg(m));
+  v.appendChild(history);
+
+  if (Bridge.standalone) {
+    const w = el("div", "panel warn");
+    w.style.marginTop = "14px";
+    w.appendChild(el("h3", null, "No brain attached"));
+    w.appendChild(el("p", null, "Install this app into a BrainFoundry brain to use it."));
+    v.appendChild(w);
+  }
+
+  /* render chips */
+  const chipNodes = THEORY_CONCEPTS.map((c) => {
+    const b = document.createElement("button");
+    b.className = "chip";
+    b.textContent = c.label;
+    b.dataset.id = c.id;
+    b.disabled = Bridge.standalone;
+    b.onclick = () => askConcept(c, b);
+    chips.appendChild(b);
+    return b;
+  });
+
+  async function askConcept(concept, chipBtn) {
+    if (state.theory.busy) return;
+    state.theory.busy = true;
+    chipNodes.forEach((cn) => { cn.disabled = true; });
+    chipBtn.classList.add("busy");
+
+    // append "you (concept)" message
+    const youMsg = { who: "you", body: concept.label };
+    state.theory.history.push(youMsg);
+    history.appendChild(renderMsg(youMsg));
+
+    // append "thinking" placeholder
+    const thinking = { who: "brain", body: "thinking…", thinking: true };
+    state.theory.history.push(thinking);
+    const thinkingEl = renderMsg(thinking);
+    history.appendChild(thinkingEl);
+
+    const system =
+      "You are this person's brain. They have selected a poker concept they want to understand. Explain the concept clearly in flowing prose, ~150-300 words.\n\n" +
+      "STRUCTURE: first the technical definition (one or two sentences), then how it shows up in actual play, then any structural isomorphism to mathematics / decision theory / probability that is real (e.g. mixed strategy is genuinely ergodic, bluff frequency is genuinely stochastic). Where the resemblance is poetic but not structural, leave it unsaid.\n\n" +
+      "GROUNDING: if the operator has ingested any framework / theory / hand-history material that touches this concept, ground specific examples in it and cite. If not, fall back to general game-theory knowledge.\n\n" +
+      "VOICE: no headings, no bullet lists, no code fences. Prose. Address the operator as 'you' where natural. Do not over-romanticise; name the mathematics first, the philosophy after, and only if it is true.";
+    const userMsg = "Concept: " + concept.label + "\n\nExplain it.";
+
+    const res = await Bridge.call("llm.complete", {
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: userMsg },
+      ],
+    }, 180000);
+
+    // remove thinking
+    state.theory.history.pop();
+    thinkingEl.remove();
+
+    if (!res || !res.ok) {
+      const code = (res && res.error && res.error.code) || "unknown";
+      const msg = { who: "brain", body: bridgeErrorMessage(code), err: true };
+      state.theory.history.push(msg);
+      history.appendChild(renderMsg(msg));
+    } else {
+      const r = res.result || {};
+      const msg = {
+        who: "brain",
+        title: concept.label,
+        body: r.text || "(empty reply)",
+        sources: Array.isArray(r.sources) ? r.sources : [],
+        model: r.model || null,
+        origin: "theory:" + concept.id,
+      };
+      state.theory.history.push(msg);
+      history.appendChild(renderMsg(msg));
+    }
+
+    state.theory.busy = false;
+    chipNodes.forEach((cn) => { cn.disabled = Bridge.standalone; });
+    chipBtn.classList.remove("busy");
+  }
+
+  show(v);
+}
+
+/* ----------------------------------------------------------------------
+   Keep-card — inline propose-from-text. Used by Ask + Theory answers.
+   text is brain-produced; operator edits + chooses layer/kind, approves.
+---------------------------------------------------------------------- */
+function keepCard(seed, hooks) {
+  const card = el("div", "keep-card");
+
+  const lLab = el("label", null, "Layer");
+  card.appendChild(lLab);
+  const layerSel = document.createElement("select");
+  for (const L of LAYERS) {
+    const o = document.createElement("option");
+    o.value = L; o.textContent = L;
+    if (L === "semantic") o.selected = true;
+    layerSel.appendChild(o);
+  }
+  layerSel.style.background = "var(--paper-2)";
+  layerSel.style.color = "var(--ink)";
+  layerSel.style.border = "1px solid var(--line)";
+  layerSel.style.padding = "5px 8px";
+  layerSel.style.fontFamily = "var(--mono)";
+  layerSel.style.fontSize = "12px";
+  card.appendChild(layerSel);
+
+  const kLab = el("label", null, "Kind");
+  card.appendChild(kLab);
+  const kindSel = document.createElement("select");
+  for (const K of KINDS_KEEP) {
+    const o = document.createElement("option");
+    o.value = K; o.textContent = K;
+    if (K === (seed.origin && seed.origin.startsWith("theory") ? "concept-explainer" : "insight")) o.selected = true;
+    kindSel.appendChild(o);
+  }
+  kindSel.style.background = "var(--paper-2)";
+  kindSel.style.color = "var(--ink)";
+  kindSel.style.border = "1px solid var(--line)";
+  kindSel.style.padding = "5px 8px";
+  kindSel.style.fontFamily = "var(--mono)";
+  kindSel.style.fontSize = "12px";
+  card.appendChild(kindSel);
+
+  const tLab = el("label", null, "Title");
+  card.appendChild(tLab);
+  const ti = document.createElement("input");
+  ti.type = "text"; ti.value = seed.seed_title || "";
+  card.appendChild(ti);
+
+  const cLab = el("label", null, "Content (markdown allowed)");
+  card.appendChild(cLab);
+  const co = document.createElement("textarea");
+  co.value = seed.seed_content || "";
+  co.style.minHeight = "140px";
+  card.appendChild(co);
+
+  const row = el("div", "row");
+  const status = el("div", "status muted", "");
+  status.style.flex = "1";
+  row.appendChild(status);
+  const cancel = el("button", "cta ghost small", "Cancel");
+  const save = el("button", "cta small", "Keep");
+  row.appendChild(cancel);
+  row.appendChild(save);
+  card.appendChild(row);
+
+  cancel.onclick = () => hooks.onClose && hooks.onClose();
+  save.onclick = async () => {
+    save.disabled = true; cancel.disabled = true;
+    layerSel.disabled = true; kindSel.disabled = true;
+    ti.disabled = true; co.disabled = true;
+    status.className = "status"; status.textContent = "writing to your brain…";
+
+    const content = ti.value.trim()
+      ? ("# " + ti.value.trim() + "\n\n" + (co.value || ""))
+      : (co.value || "");
+
+    const metadata = {
+      kind: kindSel.value,
+      app: "poker-journal",
+      mode: "keep",
+      origin: seed.origin || "ask",
+      title: ti.value,
+      created: new Date().toISOString(),
+    };
+    if (Array.isArray(seed.sources) && seed.sources.length) {
+      metadata.sources = seed.sources.map((x) =>
+        typeof x === "string" ? x : (x.document_name || x.title || "?"));
+    }
+
+    const res = await Bridge.call("memory.write", {
+      layer: layerSel.value, content, source: "poker-journal", metadata,
+    }, 30000);
+
+    if (res && res.ok) {
+      hooks.onSaved && hooks.onSaved();
+    } else {
+      const code = (res && res.error && res.error.code) || "unknown";
+      status.className = "status err";
+      status.textContent =
+        code === "timeout" ? "your brain didn't answer in time"
+        : code === "standalone" ? "no brain attached"
+        : "couldn't save (" + code + ")";
+      save.disabled = false; cancel.disabled = false;
+      layerSel.disabled = false; kindSel.disabled = false;
+      ti.disabled = false; co.disabled = false;
+    }
+  };
+
+  return card;
 }
 
 /* ----------------------------------------------------------------------

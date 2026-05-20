@@ -10,7 +10,7 @@ Most poker study lives in spreadsheets, PDFs, scattered notes, or
 trackers owned by someone else. Poker Journal is a thin instrument for
 keeping the record where your other thinking lives — in your brain.
 
-Three modes:
+Four modes:
 
 - **Hand** — paste a hand-history export (e.g. PokerStars text). Your
   brain reads it and proposes a session entry plus zero or more leak
@@ -21,6 +21,14 @@ Three modes:
 - **Ask** — grounded chat scoped to your poker corpus. The brain
   answers from your own hand histories, leaks, impressions, and any
   framework documents you have ingested.
+- **Theory** — click a poker concept (pot odds, Nash equilibrium,
+  ergodicity, ICM, ...). The brain explains it, grounded in any
+  theory material you have ingested. "Keep this" saves notable
+  explanations into your own memory.
+
+Every brain answer (Ask and Theory) carries a **Keep this** button —
+opens an inline propose-card, you edit the title/content and pick a
+layer, your brain stores it.
 
 ## Install
 
@@ -34,11 +42,13 @@ brain's reasoner and memory through the brain-app `postMessage`
 bridge:
 
 - `llm.complete` — reads pasted text (Hand) or reflection answers
-  (Reflect), and returns a JSON array of proposed memory entries; for
-  Ask, returns a grounded answer scoped to the read-mode layers
-  declared in `brain-app.yaml`.
+  (Reflect), returns a JSON array of proposed memory entries; for
+  Ask, returns a grounded answer; for Theory, returns a concept
+  explanation grounded in ingested theory material. Retrieval is
+  scoped to the read-mode layers declared in `brain-app.yaml`.
 - `memory.write` — one call per approved proposal, appended to the
-  layer the operator confirmed.
+  layer the operator confirmed. Also fires once per Keep-this from a
+  brain answer.
 
 Until the operator clicks Approve, nothing touches the brain's memory.
 Skip discards a proposal.
