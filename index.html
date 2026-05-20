@@ -1,20 +1,22 @@
 <!DOCTYPE html>
 <!--
   Poker Journal — a brain-app for BrainFoundry brains.
-  Created: 2026-05-20
+  Created: 2026-05-20. v0.3 visual identity: matched to the hbar.poker
+  site (cream paper, system sans, mono for data, restrained tabs).
+  Museum-vitrine, not wisdom-shrine.
 
-  Three modes:
+  Four modes:
    - Hand     paste a hand-history export -> brain proposes session +
               leak entries -> operator approves per entry.
    - Reflect  post-session prompts -> brain proposes impressions +
               leak entries -> operator approves per entry.
-   - Ask      grounded chat scoped to the operator's poker corpus via
-              the read-mode layers declared in brain-app.yaml.
+   - Ask      grounded chat scoped to the operator's poker corpus.
+   - Theory   click a poker concept; brain explains it, grounded;
+              Keep this saves notable explanations.
 
   One self-contained file. No dependencies, no CDN, no build. Opened
   standalone (no host brain) the app shows a "no brain attached"
-  message; no local proposals are fabricated and no canned answers are
-  returned.
+  message; no local proposals are fabricated.
 -->
 <html lang="en">
 <head>
@@ -23,188 +25,467 @@
 <title>Poker Journal</title>
 <style>
   :root {
-    --ink: #ece3d0;
-    --ink-dim: #9a8f78;
-    --ink-faint: #5f5743;
-    --paper: #14110c;
-    --paper-2: #1d1813;
-    --paper-3: #241d12;
-    --gold: #c9a24b;
-    --gold-dim: #6f5c30;
-    --line: #2c2519;
-    --line-soft: #211a11;
-    --red-dim: #7a3f2d;
-    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
-    --mono: "SF Mono", ui-monospace, "JetBrains Mono", Menlo, monospace;
+    /* Palette lifted from hbar.poker/styles.css */
+    --paper:        #f7f6f4;
+    --paper-2:      #fbfaf8;
+    --paper-3:      #efeee9;
+    --paper-white:  #fffffe;
+    --ink-dark:     #1a1a1a;
+    --ink:          #2b2b2b;
+    --ink-med:      #3a3a3a;
+    --ink-dim:      #5a5a5a;
+    --ink-soft:     #7a7a7a;
+    --ink-faint:    #9a9a9a;
+    --ink-faintest: #bbb;
+    --line:         #d4d0c8;
+    --line-soft:    #e8e5df;
+    --line-dashed:  #c9c5bd;
+    --notice-bg:     #fef9ed;
+    --notice-border: #e8dcc4;
+    --notice-text:   #7a6a4a;
+    --err-bg:        #fdf0ee;
+    --err-border:    #e8c4bc;
+    --err-text:      #8a4a3a;
+    --ok-bg:         #f4faf5;
+    --ok-border:     #c4dcc8;
+    --ok-text:       #4a7a5a;
+    --link:          #6b7fa8;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica', 'Arial', sans-serif;
+    --mono: 'Courier New', 'Courier', monospace;
   }
+
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; }
   body {
-    background:
-      radial-gradient(1100px 700px at 50% -10%, #221b12 0%, var(--paper) 60%);
+    font-family: var(--sans);
+    font-size: 17px;
+    line-height: 1.7;
     color: var(--ink);
-    font-family: var(--serif);
-    -webkit-font-smoothing: antialiased;
-    line-height: 1.5;
+    background: var(--paper);
     min-height: 100%;
   }
-  #frame { width: 100%; max-width: 760px; margin: 0 auto; padding: 28px 22px 80px; }
-  header.app { text-align: center; margin-bottom: 22px; }
-  header.app .glyph {
-    font-size: 12px; letter-spacing: 0.42em; color: var(--gold);
-    text-transform: lowercase;
+  #frame {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 2.5rem 2rem 4rem;
   }
-  header.app h1 {
-    font-family: var(--serif); font-size: 28px; font-weight: 500;
-    margin-top: 6px; letter-spacing: 0.01em;
-  }
-  header.app .sub { color: var(--ink-dim); font-size: 13.5px; font-style: italic; margin-top: 6px; }
 
+  header {
+    margin-bottom: 2.5rem;
+  }
+  header h1 {
+    font-size: 1.75rem;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    color: var(--ink-dark);
+    margin-bottom: 0.35rem;
+  }
+  header .subtitle {
+    font-size: 0.95rem;
+    color: var(--ink-dim);
+    line-height: 1.5;
+    margin-bottom: 0.5rem;
+  }
+  header .intent {
+    font-size: 0.9rem;
+    color: var(--ink-soft);
+    font-style: italic;
+    line-height: 1.5;
+  }
+  header .classification {
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+    line-height: 1.5;
+    margin-top: 0.5rem;
+  }
+
+  /* Modes nav — mirrors .tabs from the site exactly. */
   nav.modes {
-    display: flex; justify-content: center; gap: 4px;
-    margin: 18px 0 22px;
+    display: flex;
+    gap: 1.25rem;
     border-bottom: 1px solid var(--line);
-    padding-bottom: 1px;
+    margin-bottom: 2.5rem;
+    padding-bottom: 0.05rem;
   }
   nav.modes button {
-    background: transparent; border: 0; color: var(--ink-dim);
-    font-family: var(--serif); font-size: 14px;
-    padding: 9px 18px; cursor: pointer;
-    border-bottom: 2px solid transparent; margin-bottom: -1px;
-    letter-spacing: 0.04em;
+    background: none;
+    border: 0;
+    border-bottom: 1px solid transparent;
+    margin-bottom: -1px;
+    padding: 0.35rem 0 0.55rem;
+    font-family: var(--sans);
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-faint);
+    cursor: pointer;
+    transition: color 0.12s ease, border-color 0.12s ease;
   }
-  nav.modes button:hover { color: var(--ink); }
-  nav.modes button.active { color: var(--gold); border-bottom-color: var(--gold-dim); }
-
-  textarea, input[type="text"], input[type="date"] {
-    width: 100%; background: var(--paper-2); color: var(--ink);
-    border: 1px solid var(--line); border-radius: 2px;
-    font-family: var(--mono); font-size: 13px;
-    padding: 10px 12px; outline: none;
+  nav.modes button:hover { color: var(--ink-med); }
+  nav.modes button.active {
+    color: var(--ink-dark);
+    border-bottom-color: var(--ink);
   }
-  textarea { resize: vertical; min-height: 180px; line-height: 1.5; }
-  textarea:focus, input:focus { border-color: var(--gold-dim); }
 
-  label { display: block; font-size: 12px; color: var(--ink-dim);
-    text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 6px; }
+  /* Section headings (h3 inside panels) — mirrors h2 from the site. */
+  h2, h3 {
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--ink-soft);
+    margin-bottom: 0.6rem;
+  }
 
-  .field { margin-bottom: 14px; }
-  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  /* Inputs */
+  textarea, input[type="text"], input[type="date"], select {
+    width: 100%;
+    background: var(--paper-white);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    font-family: var(--sans);
+    font-size: 0.92rem;
+    padding: 0.55rem 0.75rem;
+    outline: none;
+    line-height: 1.55;
+  }
+  textarea {
+    resize: vertical;
+    min-height: 140px;
+  }
+  textarea:focus, input:focus, select:focus {
+    border-color: var(--ink-faint);
+  }
+  label {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--ink-faint);
+    margin-bottom: 0.4rem;
+  }
+
+  .field { margin-bottom: 1.1rem; }
+  .row {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    flex-wrap: wrap;
+  }
   .row .spacer { flex: 1; }
 
+  /* Buttons — restrained, sober. */
   button.cta {
-    background: var(--paper-3); color: var(--ink); border: 1px solid var(--gold-dim);
-    font-family: var(--serif); font-size: 14px;
-    padding: 9px 18px; cursor: pointer; border-radius: 2px;
-    letter-spacing: 0.04em;
+    background: var(--paper-2);
+    color: var(--ink-dark);
+    border: 1px solid var(--line);
+    font-family: var(--sans);
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.5rem 1.1rem;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
   }
-  button.cta:hover:not(:disabled) { border-color: var(--gold); color: var(--gold); }
+  button.cta:hover:not(:disabled) {
+    background: var(--paper-3);
+    border-color: var(--ink-faint);
+  }
   button.cta:disabled { opacity: 0.4; cursor: not-allowed; }
-  button.cta.small { padding: 6px 12px; font-size: 12.5px; }
-  button.cta.ghost { background: transparent; border-color: var(--line); color: var(--ink-dim); }
-  button.cta.ghost:hover:not(:disabled) { border-color: var(--ink-dim); color: var(--ink); }
+  button.cta.small { padding: 0.32rem 0.75rem; font-size: 0.72rem; }
+  button.cta.ghost {
+    background: transparent;
+    border-color: transparent;
+    color: var(--ink-faint);
+  }
+  button.cta.ghost:hover:not(:disabled) {
+    background: var(--paper-3);
+    border-color: var(--line);
+    color: var(--ink);
+  }
 
+  /* Panels — for empty-states, warnings, "no brain attached" etc. */
   .panel {
-    background: var(--paper-2); border: 1px solid var(--line);
-    border-radius: 2px; padding: 14px 16px; margin-top: 14px;
+    background: var(--paper-2);
+    border: 1px solid var(--line-soft);
+    border-radius: 3px;
+    padding: 1rem 1.15rem;
+    margin-top: 1rem;
   }
-  .panel.warn { border-color: var(--red-dim); }
-  .panel h3 { font-size: 14px; font-weight: 500; color: var(--gold); margin-bottom: 6px; }
-  .panel p { font-size: 13.5px; color: var(--ink-dim); }
-  .panel .acts { margin-top: 10px; display: flex; gap: 8px; }
+  .panel.warn {
+    background: var(--err-bg);
+    border-color: var(--err-border);
+  }
+  .panel.warn h3 { color: var(--err-text); }
+  .panel p {
+    font-size: 0.88rem;
+    color: var(--ink-soft);
+    line-height: 1.65;
+  }
+  .panel.warn p { color: var(--err-text); }
+  .panel .acts { margin-top: 0.85rem; display: flex; gap: 0.5rem; }
 
-  .pulse { text-align: center; font-style: italic; color: var(--gold);
-    margin-top: 40px; letter-spacing: 0.06em; animation: pulse 1.4s ease-in-out infinite; }
-  @keyframes pulse { 0%,100% { opacity: 0.45; } 50% { opacity: 1; } }
-  .note { text-align: center; color: var(--ink-faint); font-size: 12.5px; margin-top: 14px; }
+  .pulse {
+    text-align: center;
+    font-style: italic;
+    color: var(--ink-soft);
+    margin-top: 2.5rem;
+    letter-spacing: 0.06em;
+    font-size: 0.9rem;
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
+  .note {
+    text-align: center;
+    color: var(--ink-faintest);
+    font-size: 0.85rem;
+    margin-top: 1rem;
+  }
 
+  /* Toolbar above proposal lists */
   .toolbar {
-    display: flex; align-items: center; gap: 12px;
-    padding: 8px 0 12px; border-bottom: 1px solid var(--line); margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    padding: 0.4rem 0 0.85rem;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 1rem;
   }
-  .toolbar .summary { font-size: 13px; color: var(--ink-dim); }
-  .toolbar .acts { margin-left: auto; display: flex; gap: 8px; }
+  .toolbar .summary { font-size: 0.85rem; color: var(--ink-soft); }
+  .toolbar .acts { margin-left: auto; display: flex; gap: 0.5rem; }
 
-  .props { display: flex; flex-direction: column; gap: 12px; }
+  /* Proposal cards (Hand / Reflect output) */
+  .props { display: flex; flex-direction: column; gap: 0.85rem; }
   .prop {
-    background: var(--paper-2); border: 1px solid var(--line);
-    border-radius: 2px; padding: 12px 14px;
+    background: var(--paper-2);
+    border: 1px solid var(--line-soft);
+    border-radius: 3px;
+    padding: 0.85rem 1rem;
   }
-  .prop.approved { border-color: var(--gold-dim); opacity: 0.85; }
-  .prop.skipped { opacity: 0.4; }
-  .prop .head { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .prop.approved {
+    background: var(--ok-bg);
+    border-color: var(--ok-border);
+  }
+  .prop.skipped { opacity: 0.45; }
+  .prop .head {
+    display: flex;
+    gap: 0.7rem;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 0.5rem;
+  }
   .prop .head select {
-    background: var(--paper-3); color: var(--ink);
-    border: 1px solid var(--line); border-radius: 2px;
-    font-family: var(--mono); font-size: 12px; padding: 3px 6px;
+    width: auto;
+    background: var(--paper-white);
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    padding: 0.2rem 0.5rem;
   }
-  .prop .kind { font-size: 11px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.1em; }
-  .prop .conf { font-size: 11.5px; color: var(--ink-dim); margin-left: auto; }
-  .prop .title { font-size: 15px; font-weight: 500; margin-top: 8px; color: var(--ink); }
-  .prop .body { font-size: 13.5px; color: var(--ink-dim); margin-top: 6px; white-space: pre-wrap; }
-  .prop .body.clipped { max-height: 4.5em; overflow: hidden; position: relative; }
-  .prop .expand { color: var(--gold-dim); font-size: 12px; font-style: italic;
-    margin-top: 4px; cursor: pointer; display: inline-block; }
-  .prop .expand:hover { color: var(--ink-dim); }
-  .prop .row { margin-top: 10px; }
-  .prop .status { font-size: 12.5px; color: var(--gold); font-style: italic; margin-left: 4px; }
-  .prop .status.err { color: #d18066; }
-  .prop .status.muted { color: var(--ink-faint); }
+  .prop .kind {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--ink-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .prop .conf {
+    font-size: 0.78rem;
+    color: var(--ink-faint);
+    margin-left: auto;
+    font-family: var(--mono);
+  }
+  .prop .title {
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--ink-dark);
+    margin-bottom: 0.3rem;
+    line-height: 1.4;
+  }
+  .prop .body {
+    font-size: 0.88rem;
+    color: var(--ink-med);
+    line-height: 1.65;
+    white-space: pre-wrap;
+  }
+  .prop .body.clipped {
+    max-height: 4.5em;
+    overflow: hidden;
+    position: relative;
+  }
+  .prop .expand {
+    color: var(--link);
+    font-size: 0.78rem;
+    font-style: italic;
+    margin-top: 0.35rem;
+    cursor: pointer;
+    display: inline-block;
+  }
+  .prop .expand:hover { text-decoration: underline; }
+  .prop .row { margin-top: 0.7rem; }
+  .prop .status { font-size: 0.78rem; color: var(--ok-text); font-style: italic; }
+  .prop .status.err { color: var(--err-text); }
+  .prop .status.muted { color: var(--ink-faintest); }
 
-  .chat { display: flex; flex-direction: column; gap: 12px; }
-  .chat .msg { padding: 10px 12px; border: 1px solid var(--line);
-    background: var(--paper-2); border-radius: 2px; font-size: 14px; }
-  .chat .msg.you { border-color: var(--gold-dim); }
-  .chat .msg .who { font-size: 11px; color: var(--ink-faint); text-transform: uppercase;
-    letter-spacing: 0.12em; margin-bottom: 4px; }
-  .chat .msg .body { white-space: pre-wrap; color: var(--ink); }
-  .chat .msg .srcs { margin-top: 8px; font-size: 11.5px; color: var(--ink-faint); }
-  .chat-input { display: flex; gap: 8px; margin-top: 14px; align-items: flex-end; }
-  .chat-input textarea { min-height: 60px; }
-  .msg .keep-bar { margin-top: 8px; display: flex; gap: 8px; align-items: center; }
-  .msg .keep-bar button {
-    background: transparent; border: 1px solid var(--line); color: var(--ink-dim);
-    font-family: var(--serif); font-size: 12px; padding: 4px 10px;
-    cursor: pointer; border-radius: 2px; letter-spacing: 0.04em;
+  /* Chat — Ask and Theory both use this */
+  .chat { display: flex; flex-direction: column; gap: 0.85rem; }
+  .chat .msg {
+    padding: 0.8rem 1rem;
+    border: 1px solid var(--line-soft);
+    background: var(--paper-2);
+    border-radius: 3px;
+    font-size: 0.92rem;
   }
-  .msg .keep-bar button:hover:not(:disabled) { color: var(--gold); border-color: var(--gold-dim); }
+  .chat .msg.you {
+    background: var(--paper-3);
+    border-color: var(--line);
+  }
+  .chat .msg .who {
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: var(--ink-faintest);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 0.35rem;
+  }
+  .chat .msg .body {
+    white-space: pre-wrap;
+    color: var(--ink);
+    line-height: 1.7;
+  }
+  .chat .msg .srcs {
+    margin-top: 0.6rem;
+    font-size: 0.75rem;
+    color: var(--ink-faintest);
+    font-family: var(--mono);
+  }
+  .chat-input {
+    display: flex;
+    gap: 0.55rem;
+    margin-top: 1rem;
+    align-items: flex-end;
+  }
+  .chat-input textarea { min-height: 4rem; }
+  .msg .keep-bar {
+    margin-top: 0.55rem;
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+  .msg .keep-bar button {
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--ink-faint);
+    font-family: var(--sans);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.25rem 0.65rem;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: color 0.12s ease, border-color 0.12s ease;
+  }
+  .msg .keep-bar button:hover:not(:disabled) {
+    color: var(--ink-dark);
+    border-color: var(--ink-faint);
+  }
   .msg .keep-bar button:disabled { opacity: 0.45; cursor: not-allowed; }
-  .msg .keep-bar .kept { font-size: 11.5px; color: var(--gold); font-style: italic; }
+  .msg .keep-bar .kept {
+    font-size: 0.75rem;
+    color: var(--ok-text);
+    font-style: italic;
+  }
 
   .keep-card {
-    margin-top: 8px; padding: 12px 14px;
-    background: var(--paper-3); border: 1px solid var(--gold-dim); border-radius: 2px;
+    margin-top: 0.55rem;
+    padding: 0.85rem 1rem;
+    background: var(--notice-bg);
+    border: 1px solid var(--notice-border);
+    border-radius: 3px;
   }
-  .keep-card label { margin-top: 8px; }
+  .keep-card label {
+    margin-top: 0.55rem;
+    color: var(--notice-text);
+  }
   .keep-card label:first-child { margin-top: 0; }
-  .keep-card .row { margin-top: 12px; }
+  .keep-card .row { margin-top: 0.9rem; }
+  .keep-card input, .keep-card textarea, .keep-card select {
+    background: var(--paper-white);
+    border-color: var(--notice-border);
+  }
+  .keep-card input:focus, .keep-card textarea:focus, .keep-card select:focus {
+    border-color: var(--notice-text);
+  }
 
+  /* Theory chips */
   .chips {
-    display: flex; flex-wrap: wrap; gap: 8px;
-    margin-bottom: 18px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-bottom: 1.25rem;
   }
   .chip {
-    background: var(--paper-2); border: 1px solid var(--line); color: var(--ink-dim);
-    font-family: var(--serif); font-size: 13px;
-    padding: 6px 12px; border-radius: 14px; cursor: pointer;
-    letter-spacing: 0.02em;
+    background: var(--paper-2);
+    border: 1px solid var(--line);
+    color: var(--ink-med);
+    font-family: var(--sans);
+    font-size: 0.78rem;
+    padding: 0.3rem 0.75rem;
+    border-radius: 2px;
+    cursor: pointer;
+    letter-spacing: 0.01em;
+    transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
   }
-  .chip:hover:not(:disabled) { color: var(--gold); border-color: var(--gold-dim); }
-  .chip:disabled { opacity: 0.45; cursor: not-allowed; }
-  .chip.busy { color: var(--gold); border-color: var(--gold); animation: pulse 1.2s ease-in-out infinite; }
+  .chip:hover:not(:disabled) {
+    background: var(--paper-3);
+    color: var(--ink-dark);
+    border-color: var(--ink-faint);
+  }
+  .chip:disabled { opacity: 0.4; cursor: not-allowed; }
+  .chip.busy {
+    background: var(--notice-bg);
+    color: var(--notice-text);
+    border-color: var(--notice-border);
+    animation: pulse 1.2s ease-in-out infinite;
+  }
 
   .mode-tag {
-    text-align: center; margin-top: 26px; font-size: 11.5px;
-    letter-spacing: 0.16em; text-transform: uppercase; color: var(--gold-dim);
+    text-align: center;
+    margin-top: 2.5rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--ink-faintest);
+  }
+
+  /* Footer-style version pin (echoes the site's .footer-version) */
+  .version-pin {
+    text-align: center;
+    margin-top: 0.4rem;
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--ink-faintest);
+    letter-spacing: 0.03em;
+  }
+
+  @media (max-width: 600px) {
+    body { font-size: 16px; }
+    #frame { padding: 1.75rem 1.1rem 3rem; }
+    header h1 { font-size: 1.4rem; }
+    nav.modes { gap: 0.85rem; }
   }
 </style>
 </head>
 <body>
 <div id="frame">
-  <header class="app">
-    <div class="glyph">&#8463; &nbsp;poker journal</div>
+  <header>
     <h1>Poker Journal</h1>
-    <div class="sub">paste &middot; reflect &middot; ask &mdash; your brain keeps the record</div>
+    <p class="subtitle">A brain-app for keeping a field journal where the rest of your thinking lives.</p>
+    <p class="intent">Paste hands, reflect, ask, study concepts. Your brain keeps the record.</p>
+    <p class="classification">Brain-app &middot; part of hbar.poker.</p>
   </header>
 
   <nav class="modes">
@@ -216,6 +497,7 @@
 
   <div id="stage"></div>
   <div id="modeTag" class="mode-tag"></div>
+  <div class="version-pin">poker-journal &middot; v0.3.0</div>
 </div>
 
 <script>
@@ -363,8 +645,8 @@ function render() {
 ---------------------------------------------------------------------- */
 function viewHand() {
   modeTag.textContent = Bridge.standalone
-    ? "standalone &middot; no brain attached"
-    : "hand &middot; paste a hand-history export";
+    ? "standalone · no brain attached"
+    : "hand · paste a hand-history export";
 
   const v = el("div");
 
@@ -423,7 +705,7 @@ function viewHand() {
 
   btn.onclick = async () => {
     btn.disabled = true;
-    modeTag.textContent = "hand &middot; reading &mdash; classifying the hand";
+    modeTag.textContent = "hand · reading — classifying the hand";
     show(el("div", "pulse", "Reading"));
 
     const r = await proposeFromHand();
@@ -466,8 +748,8 @@ async function proposeFromHand() {
 ---------------------------------------------------------------------- */
 function viewReflect() {
   modeTag.textContent = Bridge.standalone
-    ? "standalone &middot; no brain attached"
-    : "reflect &middot; write briefly &mdash; your brain synthesises";
+    ? "standalone · no brain attached"
+    : "reflect · write briefly — your brain synthesises";
 
   const v = el("div");
 
@@ -485,11 +767,11 @@ function viewReflect() {
     return input;
   }
 
-  const i1 = fld("Stakes / format", "stakes", "e.g. NL2, 6-max", false);
-  const i2 = fld("Duration / hand count (rough)", "duration", "e.g. ~2 hours, ~180 hands", false);
-  const i3 = fld("What spots felt off?", "felt_off", "First thing that comes &mdash; one or two spots. No analysis.", true);
-  const i4 = fld("Where did discipline slip?", "discipline", "Calls without read, autopilot, results-based thinking, tilt&hellip;", true);
-  const i5 = fld("Dominant emotion at the table?", "emotion", "One sentence is enough.", true);
+  fld("Stakes / format", "stakes", "e.g. NL2, 6-max", false);
+  fld("Duration / hand count (rough)", "duration", "e.g. ~2 hours, ~180 hands", false);
+  const i3 = fld("What spots felt off?", "felt_off", "First thing that comes — one or two spots. No analysis.", true);
+  fld("Where did discipline slip?", "discipline", "Calls without read, autopilot, results-based thinking, tilt…", true);
+  fld("Dominant emotion at the table?", "emotion", "One sentence is enough.", true);
 
   const row = el("div", "row");
   row.appendChild(el("div", "spacer"));
@@ -514,7 +796,7 @@ function viewReflect() {
 
   btn.onclick = async () => {
     btn.disabled = true;
-    modeTag.textContent = "reflect &middot; reading &mdash; synthesising entries";
+    modeTag.textContent = "reflect · reading — synthesising entries";
     show(el("div", "pulse", "Reading"));
 
     const r = await proposeFromReflect();
@@ -561,8 +843,8 @@ async function proposeFromReflect() {
 ---------------------------------------------------------------------- */
 function viewAsk() {
   modeTag.textContent = Bridge.standalone
-    ? "standalone &middot; no brain attached"
-    : "ask &middot; grounded in your poker corpus";
+    ? "standalone · no brain attached"
+    : "ask · grounded in your poker corpus";
 
   const v = el("div");
 
@@ -579,7 +861,7 @@ function viewAsk() {
 
   const inputWrap = el("div", "chat-input");
   const ta = document.createElement("textarea");
-  ta.placeholder = "Ask &mdash; e.g. 'what are my active leaks?', 'summarise my voice charter', 'where did I misplay in the March 16 session?'";
+  ta.placeholder = "Ask — e.g. 'what are my active leaks?', 'summarise my voice charter', 'where did I misplay in the March 16 session?'";
   ta.style.flex = "1";
   inputWrap.appendChild(ta);
   const btn = el("button", "cta", "Send");
@@ -654,7 +936,7 @@ function renderMsg(m) {
   n.appendChild(el("div", "who", m.who === "you" ? "you" : "your brain"));
   const body = el("div", "body");
   body.textContent = m.body;
-  if (m.err) body.style.color = "#d18066";
+  if (m.err) body.style.color = "var(--err-text)";
   if (m.thinking) body.style.fontStyle = "italic";
   n.appendChild(body);
   if (m.sources && m.sources.length) {
@@ -674,14 +956,13 @@ function renderMsg(m) {
     n.appendChild(bar);
 
     btn.onclick = () => {
-      // Already kept or open — guard
       if (n.querySelector(".keep-card")) return;
       btn.disabled = true;
       const card = keepCard({
         seed_title: m.title || deriveTitle(m.body),
         seed_content: m.body,
         sources: m.sources || [],
-        origin: m.origin || "ask",     // "ask" or "theory:<concept-id>"
+        origin: m.origin || "ask",
       }, {
         onClose: () => { card.remove(); btn.disabled = Bridge.standalone; },
         onSaved: () => {
@@ -696,47 +977,42 @@ function renderMsg(m) {
   return n;
 }
 
-/* ---- derive a short title from arbitrary text ---- */
 function deriveTitle(text) {
   const first = String(text || "").trim().split(/\n/)[0] || "";
   return first.length > 90 ? first.slice(0, 87) + "…" : first;
 }
 
 /* ----------------------------------------------------------------------
-   THEORY — click a concept, brain explains it, optionally keep the
-   explanation as a memory entry.
+   THEORY — click a concept, brain explains it, optionally keep it.
 ---------------------------------------------------------------------- */
 function viewTheory() {
   modeTag.textContent = Bridge.standalone
-    ? "standalone &middot; no brain attached"
-    : "theory &middot; pick a concept &mdash; the brain explains, grounded";
+    ? "standalone · no brain attached"
+    : "theory · pick a concept — the brain explains, grounded";
 
   const v = el("div");
 
   const note = el("div", "panel");
   note.appendChild(el("h3", null, "Study a concept"));
   note.appendChild(el("p", null,
-    "Click a concept. Your brain explains it &mdash; grounded in any theory material you have ingested, otherwise from general knowledge. Click " + '"' + "Keep this" + '"' + " on any explanation to save it into your own memory."));
+    "Click a concept. Your brain explains it &mdash; grounded in any theory material you have ingested, otherwise from general knowledge. Use Keep this on any explanation to save it into your own memory."));
   v.appendChild(note);
 
   const chips = el("div", "chips");
-  chips.style.marginTop = "16px";
+  chips.style.marginTop = "1rem";
   v.appendChild(chips);
 
   const history = el("div", "chat");
-  history.style.marginTop = "10px";
   for (const m of state.theory.history) history.appendChild(renderMsg(m));
   v.appendChild(history);
 
   if (Bridge.standalone) {
     const w = el("div", "panel warn");
-    w.style.marginTop = "14px";
     w.appendChild(el("h3", null, "No brain attached"));
     w.appendChild(el("p", null, "Install this app into a BrainFoundry brain to use it."));
     v.appendChild(w);
   }
 
-  /* render chips */
   const chipNodes = THEORY_CONCEPTS.map((c) => {
     const b = document.createElement("button");
     b.className = "chip";
@@ -754,12 +1030,10 @@ function viewTheory() {
     chipNodes.forEach((cn) => { cn.disabled = true; });
     chipBtn.classList.add("busy");
 
-    // append "you (concept)" message
     const youMsg = { who: "you", body: concept.label };
     state.theory.history.push(youMsg);
     history.appendChild(renderMsg(youMsg));
 
-    // append "thinking" placeholder
     const thinking = { who: "brain", body: "thinking…", thinking: true };
     state.theory.history.push(thinking);
     const thinkingEl = renderMsg(thinking);
@@ -779,7 +1053,6 @@ function viewTheory() {
       ],
     }, 180000);
 
-    // remove thinking
     state.theory.history.pop();
     thinkingEl.remove();
 
@@ -812,13 +1085,11 @@ function viewTheory() {
 
 /* ----------------------------------------------------------------------
    Keep-card — inline propose-from-text. Used by Ask + Theory answers.
-   text is brain-produced; operator edits + chooses layer/kind, approves.
 ---------------------------------------------------------------------- */
 function keepCard(seed, hooks) {
   const card = el("div", "keep-card");
 
-  const lLab = el("label", null, "Layer");
-  card.appendChild(lLab);
+  card.appendChild(el("label", null, "Layer"));
   const layerSel = document.createElement("select");
   for (const L of LAYERS) {
     const o = document.createElement("option");
@@ -826,16 +1097,9 @@ function keepCard(seed, hooks) {
     if (L === "semantic") o.selected = true;
     layerSel.appendChild(o);
   }
-  layerSel.style.background = "var(--paper-2)";
-  layerSel.style.color = "var(--ink)";
-  layerSel.style.border = "1px solid var(--line)";
-  layerSel.style.padding = "5px 8px";
-  layerSel.style.fontFamily = "var(--mono)";
-  layerSel.style.fontSize = "12px";
   card.appendChild(layerSel);
 
-  const kLab = el("label", null, "Kind");
-  card.appendChild(kLab);
+  card.appendChild(el("label", null, "Kind"));
   const kindSel = document.createElement("select");
   for (const K of KINDS_KEEP) {
     const o = document.createElement("option");
@@ -843,30 +1107,25 @@ function keepCard(seed, hooks) {
     if (K === (seed.origin && seed.origin.startsWith("theory") ? "concept-explainer" : "insight")) o.selected = true;
     kindSel.appendChild(o);
   }
-  kindSel.style.background = "var(--paper-2)";
-  kindSel.style.color = "var(--ink)";
-  kindSel.style.border = "1px solid var(--line)";
-  kindSel.style.padding = "5px 8px";
-  kindSel.style.fontFamily = "var(--mono)";
-  kindSel.style.fontSize = "12px";
   card.appendChild(kindSel);
 
-  const tLab = el("label", null, "Title");
-  card.appendChild(tLab);
+  card.appendChild(el("label", null, "Title"));
   const ti = document.createElement("input");
   ti.type = "text"; ti.value = seed.seed_title || "";
   card.appendChild(ti);
 
-  const cLab = el("label", null, "Content (markdown allowed)");
-  card.appendChild(cLab);
+  card.appendChild(el("label", null, "Content (markdown allowed)"));
   const co = document.createElement("textarea");
   co.value = seed.seed_content || "";
-  co.style.minHeight = "140px";
+  co.style.minHeight = "160px";
   card.appendChild(co);
 
   const row = el("div", "row");
-  const status = el("div", "status muted", "");
+  const status = el("div", "");
   status.style.flex = "1";
+  status.style.fontSize = "0.8rem";
+  status.style.color = "var(--notice-text)";
+  status.style.fontStyle = "italic";
   row.appendChild(status);
   const cancel = el("button", "cta ghost small", "Cancel");
   const save = el("button", "cta small", "Keep");
@@ -879,7 +1138,8 @@ function keepCard(seed, hooks) {
     save.disabled = true; cancel.disabled = true;
     layerSel.disabled = true; kindSel.disabled = true;
     ti.disabled = true; co.disabled = true;
-    status.className = "status"; status.textContent = "writing to your brain…";
+    status.style.color = "var(--notice-text)";
+    status.textContent = "writing to your brain…";
 
     const content = ti.value.trim()
       ? ("# " + ti.value.trim() + "\n\n" + (co.value || ""))
@@ -906,7 +1166,7 @@ function keepCard(seed, hooks) {
       hooks.onSaved && hooks.onSaved();
     } else {
       const code = (res && res.error && res.error.code) || "unknown";
-      status.className = "status err";
+      status.style.color = "var(--err-text)";
       status.textContent =
         code === "timeout" ? "your brain didn't answer in time"
         : code === "standalone" ? "no brain attached"
@@ -985,7 +1245,7 @@ function viewProposals(mode) {
     return;
   }
 
-  modeTag.textContent = mode + " &middot; proposals &mdash; review and approve";
+  modeTag.textContent = mode + " · proposals — review and approve";
   const v = el("div");
 
   const tb = el("div", "toolbar");
@@ -1014,9 +1274,9 @@ function viewProposals(mode) {
     const skipped = proposals.filter((p) => p.status === "skipped").length;
     const remaining = total - approved - skipped;
     summary.innerHTML =
-      "<b>" + total + "</b> proposed &nbsp;&middot;&nbsp; " +
-      "<b>" + approved + "</b> kept &nbsp;&middot;&nbsp; " +
-      "<b>" + skipped + "</b> skipped &nbsp;&middot;&nbsp; " +
+      "<b>" + total + "</b> proposed &nbsp;·&nbsp; " +
+      "<b>" + approved + "</b> kept &nbsp;·&nbsp; " +
+      "<b>" + skipped + "</b> skipped &nbsp;·&nbsp; " +
       "<b>" + remaining + "</b> left";
     approveAll.disabled = (remaining === 0);
   }
@@ -1148,7 +1408,7 @@ function waitFor(fn, timeoutMs) {
 }
 
 function viewError(result) {
-  modeTag.textContent = state.mode + " &middot; error &mdash; reading failed";
+  modeTag.textContent = state.mode + " · error — reading failed";
   const v = el("div");
   const p = el("div", "panel warn");
   p.appendChild(el("h3", null, "Reading failed"));
